@@ -150,11 +150,18 @@ export function cctvProxy({ sourceRoot = process.cwd() } = {}) {
           Number.isFinite(focusLon) &&
           focusLon >= -180 &&
           focusLon <= 180;
+        const forceCatalogRefresh =
+          url.pathname === '/sources' &&
+          url.searchParams.get('refresh') === '1';
         const sources =
           url.pathname === '/sources'
-            ? await getCctvSources(
-                hasViewFocus ? { lat: focusLat, lon: focusLon } : null,
-              )
+            ? forceCatalogRefresh
+              ? await getCctvSources.forceRefresh(
+                  hasViewFocus ? { lat: focusLat, lon: focusLon } : null,
+                )
+              : await getCctvSources(
+                  hasViewFocus ? { lat: focusLat, lon: focusLon } : null,
+                )
             : await getCctvSources();
         const registeredSources = await getCctvSources.getAllSources();
         if (registeredSources !== registrySnapshot) {

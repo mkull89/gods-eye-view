@@ -225,6 +225,19 @@ export function createCctvCatalog({ sourceRoot = process.cwd() } = {}) {
    * callers so a post-TTL burst launches ONE refetch, not one per request. */
   let _cctvSourceInflight = null;
 
+  async function forceRefresh(focus) {
+    if (_cctvSourceInflight) await _cctvSourceInflight;
+    if (_cctvSourceInflight) {
+      await _cctvSourceInflight;
+      return selectSources(focus);
+    }
+    _cctvSourceInflight = refreshCctvSources().finally(() => {
+      _cctvSourceInflight = null;
+    });
+    await _cctvSourceInflight;
+    return selectSources(focus);
+  }
+
   /**
    * Assemble and cache the merged CCTV source list.
    *
@@ -277,6 +290,7 @@ export function createCctvCatalog({ sourceRoot = process.cwd() } = {}) {
     await getCctvSources();
     return _cctvAllSourceCache;
   };
+  getCctvSources.forceRefresh = forceRefresh;
 
   /**
    * Assemble and cache the merged CCTV source list from file/env + live packs.
@@ -298,14 +312,17 @@ export function createCctvCatalog({ sourceRoot = process.cwd() } = {}) {
     // now governs every entry in LIVE_PACKS.
     const needsLiveSources =
       forceAustin || (fromFile.length + fromEnv.length === 0 && preferAustin);
+    const livePackEnabled = LIVE_PACKS.map((pack) =>
+      needsLiveSources && pack.enabled(),
+    );
     const liveResults = needsLiveSources
       ? await Promise.allSettled(
           // Invoked inside the promise so a loader that throws synchronously
           // (a file-based pack on a malformed row) is isolated like any other
           // failed pack instead of rejecting the whole refresh.
-          LIVE_PACKS.map((pack) =>
+          LIVE_PACKS.map((pack, index) =>
             Promise.resolve().then(() =>
-              pack.enabled() ? pack.load({ sourceRoot }) : [],
+              livePackEnabled[index] ? pack.load({ sourceRoot }) : [],
             ),
           ),
         )
@@ -319,15 +336,33 @@ export function createCctvCatalog({ sourceRoot = process.cwd() } = {}) {
         .map((item) => normalizeSourceItem(item))
         .filter((item) => item.id),
     });
+    const previousPacks = new Map(
+      _cctvPackCache.map((pack) => [pack.name, pack]),
+    );
     const packs = [
-      ...LIVE_PACKS.map((pack, index) =>
-        normalizePack(
+      ...LIVE_PACKS.map((pack, index) => {
+        const current = normalizePack(
           pack.name,
           liveResults[index]?.status === 'fulfilled'
             ? liveResults[index].value
             : [],
-        ),
-      ),
+        );
+        const previous = previousPacks.get(pack.name);
+        // A provider can briefly return no rows while the PC resumes from
+        // sleep or its network reconnects. Keep its last good pack instead of
+        // erasing hundreds of cameras. Explicitly disabled packs still clear.
+        if (
+          livePackEnabled[index] &&
+          current.sources.length === 0 &&
+          previous?.sources?.length
+        ) {
+          console.warn(
+            `[CCTV] ${pack.name} returned no cameras; retaining ${previous.sources.length} cached entries and retrying sooner`,
+          );
+          return previous;
+        }
+        return current;
+      }),
       normalizePack('file', fromFile),
       normalizePack('env', fromEnv),
     ];
@@ -368,7 +403,16 @@ export function createCctvCatalog({ sourceRoot = process.cwd() } = {}) {
         `[CCTV] source refresh returned empty; serving ${_cctvSourceCache.length} stale cameras`,
       );
     }
-    _cctvSourceCacheAt = Date.now();
+    const hasRetainedProviderPack = packs.some(
+      (pack, index) =>
+        index < LIVE_PACKS.length &&
+        livePackEnabled[index] &&
+        pack === previousPacks.get(pack.name),
+    );
+    // Retry wake-time provider failures after a short cooldown instead of
+    // caching the partial refresh for the entire normal catalog TTL.
+    _cctvSourceCacheAt = Date.now() -
+      (hasRetainedProviderPack ? Math.max(0, CCTV_SOURCE_CACHE_MS - 60_000) : 0);
     return _cctvSourceCache;
   }
 

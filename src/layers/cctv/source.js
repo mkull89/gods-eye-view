@@ -49,7 +49,10 @@ export function createCctvSource({
         Number.isFinite(focus?.lat) && Number.isFinite(focus?.lon)
           ? `?lat=${encodeURIComponent(focus.lat)}&lon=${encodeURIComponent(focus.lon)}`
           : '';
-      return read(`/api/cctv/sources${query}`, 'sources', options);
+      const freshQuery = options?.fresh
+        ? `${query ? '&' : '?'}refresh=1`
+        : '';
+      return read(`/api/cctv/sources${query}${freshQuery}`, 'sources', options);
     },
     getHealth(options) {
       return read('/api/cctv/health', 'cameras', options);

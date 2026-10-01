@@ -58,8 +58,9 @@ export function createLifecycle({
   const { onFocusTargetAppear } = services.focus;
   const { releaseContinuousRender } = services.render;
 
-  async function refreshCatalogForFocus(viewer, focus) {
-    if (layerState._catalogRefreshInFlight) return;
+  async function refreshCatalogForFocus(viewer, focus, { fresh = false } = {}) {
+    if (!viewer || layerState._catalogRefreshInFlight)
+      return { ok: false, reason: 'busy', count: layerState._count };
     layerState._catalogRefreshInFlight = true;
     const controller = new AbortController();
     layerState._catalogRefreshController = controller;
@@ -67,17 +68,30 @@ export function createLifecycle({
       const payload = await source.getCatalog({
         signal: controller.signal,
         focus,
+        fresh,
       });
       controller.signal.throwIfAborted();
       if (!Array.isArray(payload?.sources) || payload.sources.length === 0)
-        return;
+        return { ok: false, reason: 'empty', count: layerState._count };
+      if (
+        fresh &&
+        layerState._count >= 100 &&
+        payload.sources.length < layerState._count * 0.65
+      ) {
+        return {
+          ok: false,
+          reason: 'partial',
+          count: layerState._count,
+          received: payload.sources.length,
+        };
+      }
       const nextIds = new Set(payload.sources.map((camera) => camera?.id));
       if (
         nextIds.size === layerState._recordById.size &&
         layerState._records.every((record) => nextIds.has(record.camera.id))
       ) {
         layerState._catalogFocus = focus;
-        return;
+        return { ok: true, reason: 'unchanged', count: payload.sources.length };
       }
 
       const wasEnabled = layerState._enabled;
@@ -103,10 +117,13 @@ export function createLifecycle({
       console.info(
         `[Data:CCTV] Refreshed camera catalog for current view (${payload.sources.length} cameras)`,
       );
+      return { ok: true, reason: 'updated', count: payload.sources.length };
     } catch (error) {
       if (error?.name !== 'AbortError')
         console.warn('[Data:CCTV] View-based catalog refresh failed');
+      return { ok: false, reason: 'failed', count: layerState._count };
     } finally {
+      layerState._catalogLastRefreshAt = Date.now();
       if (layerState._catalogRefreshController === controller)
         layerState._catalogRefreshController = null;
       layerState._catalogRefreshInFlight = false;
@@ -115,6 +132,78 @@ export function createLifecycle({
       if (pendingFocus && layerState._viewer === viewer)
         scheduleCatalogRefresh(viewer, pendingFocus, true);
     }
+  }
+
+  async function reloadCatalog(viewer = layerState._viewer) {
+    if (!viewer)
+      return { ok: false, reason: 'not-ready', count: layerState._count };
+    if (layerState._catalogRefreshTimer)
+      clearTimeout(layerState._catalogRefreshTimer);
+    layerState._catalogRefreshTimer = null;
+    layerState._catalogPendingFocus = null;
+    return refreshCatalogForFocus(viewer, cctvViewFocus(viewer), {
+      fresh: true,
+    });
+  }
+
+  function bindCatalogWakeRefresh(viewer) {
+    if (
+      typeof document === 'undefined' ||
+      layerState._catalogVisibilityListener
+    )
+      return;
+    const scheduleWakeRefresh = (attempt = 0) => {
+      if (layerState._catalogWakeRefreshTimer)
+        clearTimeout(layerState._catalogWakeRefreshTimer);
+      layerState._catalogWakeRefreshTimer = setTimeout(
+        () => {
+          layerState._catalogWakeRefreshTimer = null;
+          if (document.hidden || layerState._viewer !== viewer) return;
+          void reloadCatalog(viewer).then((result) => {
+            if (!result?.ok && attempt < 2 && layerState._viewer === viewer) {
+              layerState._catalogWakeRefreshTimer = setTimeout(() => {
+                layerState._catalogWakeRefreshTimer = null;
+                scheduleWakeRefresh(attempt + 1);
+              }, 45_000);
+            }
+          });
+        },
+        attempt === 0 ? 8_000 : 0,
+      );
+    };
+    layerState._catalogVisibilityListener = () => {
+      if (document.hidden) {
+        layerState._catalogHiddenAt = Date.now();
+        return;
+      }
+      const hiddenAt = layerState._catalogHiddenAt;
+      layerState._catalogHiddenAt = 0;
+      if (!hiddenAt) return;
+      const awayMs = Date.now() - hiddenAt;
+      layerState._catalogLastVisibilityReturnAt = Date.now();
+      if (awayMs >= 60_000 && layerState._viewer === viewer)
+        scheduleWakeRefresh();
+    };
+    layerState._catalogWindowReturnListener = () => {
+      const now = Date.now();
+      if (
+        document.hidden ||
+        layerState._viewer !== viewer ||
+        now - layerState._catalogLastVisibilityReturnAt < 5_000 ||
+        now - layerState._catalogLastRefreshAt < 5 * 60_000
+      )
+        return;
+      scheduleWakeRefresh();
+    };
+    document.addEventListener(
+      'visibilitychange',
+      layerState._catalogVisibilityListener,
+    );
+    // Windows sleep does not always transition the tab to hidden. Focus and
+    // pageshow cover the common resume path where visibilitychange never fires.
+    window.addEventListener('focus', layerState._catalogWindowReturnListener);
+    window.addEventListener('pageshow', layerState._catalogWindowReturnListener);
+    window.addEventListener('online', layerState._catalogWindowReturnListener);
   }
 
   function scheduleCatalogRefresh(viewer, focus, immediate = false) {
@@ -167,6 +256,7 @@ export function createLifecycle({
     layerState._lastAppliedRegime = null;
   }
   const methods = {
+    reloadCatalog,
     /**
      * Initializes the CCTV layer: loads camera sources, builds the catalog,
      * restores calibration from localStorage, creates billboards, sets up click
@@ -183,6 +273,8 @@ export function createLifecycle({
           parts.cards.handleVisibilityChange,
         );
       layerState._viewer = viewer;
+      layerState._catalogLastRefreshAt = Date.now();
+      bindCatalogWakeRefresh(viewer);
       layerState._catalogFocus ||= cctvViewFocus(viewer);
       clearRuntimeState();
       layerState._enabled = false;
@@ -558,6 +650,21 @@ export function createLifecycle({
           'visibilitychange',
           parts.cards.handleVisibilityChange,
         );
+      if (layerState._catalogVisibilityListener && typeof document !== 'undefined') {
+        document.removeEventListener(
+          'visibilitychange',
+          layerState._catalogVisibilityListener,
+        );
+        window.removeEventListener('focus', layerState._catalogWindowReturnListener);
+        window.removeEventListener('pageshow', layerState._catalogWindowReturnListener);
+        window.removeEventListener('online', layerState._catalogWindowReturnListener);
+        layerState._catalogVisibilityListener = null;
+        layerState._catalogWindowReturnListener = null;
+      }
+      if (layerState._catalogWakeRefreshTimer) {
+        clearTimeout(layerState._catalogWakeRefreshTimer);
+        layerState._catalogWakeRefreshTimer = null;
+      }
       unregisterPickOwner('cctv');
       if (layerState._mapStackListener && typeof window !== 'undefined') {
         window.removeEventListener(

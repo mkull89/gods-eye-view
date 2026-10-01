@@ -618,7 +618,9 @@ function _publishDiagnostics() {
  */
 export function setDetectionStyle(styleName) {
   _themeName = styleName || 'normal';
-  _theme = THEME_MAP[_themeName] || THEME_MAP._default;
+  // Odin keeps the normal globe image and borrows CRT's gold overlay labels.
+  const themeKey = _themeName === 'odin' ? 'retro' : _themeName;
+  _theme = THEME_MAP[themeKey] || THEME_MAP._default;
   // Resolve the plate fills once per style change. The callout painter reads
   // these strings directly, so the hot path never builds a colour.
   _platePaint = _theme.calloutPlate || THEME_MAP._default.calloutPlate;

@@ -43,10 +43,7 @@ const SCOPE_OUTSIDE_COLOR = { r: 5, g: 5, b: 8 };
 /**
  * Default edge feather as a fraction of the keyhole radius.
  *
- * 0.11 since 2026-08-24 (owner final lock; 0.08 on 08-23, hard-crop 0 on
- * 08-22 — this supersedes both), REVISING the 2026-08-22 ruling that
- * set it to zero: a subtle soft edge rather than either the hard crop or the
- * retired 35 % halo. The slider is untouched and still spans 0..100; this is
+ * 0.50 as the Odin's Eye startup default. The slider is untouched and still spans 0..100; this is
  * only where it STARTS. `setScopeMaskFeather` is unchanged, so any feather a
  * share link carries, or the operator dials in, overrides this immediately, and
  * the hard-crop path at 0 is still reachable from the handle.
@@ -59,7 +56,7 @@ const SCOPE_OUTSIDE_COLOR = { r: 5, g: 5, b: 8 };
  * carries `scf=0` explicitly because the generator always writes the field.
  * Pinned in reasonableDefaults.test.mjs.
  */
-export const SCOPE_FEATHER_RATIO_DEFAULT = 0.11;
+export const SCOPE_FEATHER_RATIO_DEFAULT = 0.5;
 /**
  * Terminus opacity at/above SCOPE_TERMINUS_FAR_M — slightly translucent so
  * faint stars survive in the corners at globe scale.

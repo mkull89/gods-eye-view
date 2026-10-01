@@ -23,6 +23,7 @@ const LEGACY_BLOOM_FALLBACK = 50;
 // Style name mapping: internal → URL-friendly
 const STYLE_TO_URL = {
   normal: 'normal',
+  odin: 'odin',
   retro: 'crt',
   surveillance: 'nvg',
   thermal: 'flir',
@@ -98,13 +99,13 @@ export class ShareLinkManager {
     this.viewer = viewer;
     this._onRestore = onRestore; // callback: ({ style, bloom, sharpen }) => void
     this._debounceTimer = null;
-    this._currentStyle = 'normal';
+    this._currentStyle = 'odin';
     this._bloomEnabled = false;
     this._sharpenEnabled = false;
     this._bloomIntensity = BLOOM_INTENSITY_DEFAULT;
     this._bloomVersion = BLOOM_SCALE_VERSION;
     this._sharpenIntensity = 49;
-    this._hudVariant = 'tactical';
+    this._hudVariant = 'odin';
     this._hudVisible = false;
     this._detectionMode = 'OFF';
     this._detectionDensity = 50;
@@ -118,10 +119,9 @@ export class ShareLinkManager {
     this._detectionOutsideOpacityPct = 1;
     this._celestialRingEnabled = false;
     this._scopeEnabled = true;
-    // Feather opens on a soft 11% scope-mask edge (owner final lock 2026-08-24,
-    // superseding the 08-22 hard-crop and 08-23 8% rulings) — mirrors
+    // Feather opens on a 50% scope-mask edge — mirrors
     // SCOPE_FEATHER_RATIO_DEFAULT in scopeMask.js and the slider's markup value.
-    this._scopeFeatherPct = 11;
+    this._scopeFeatherPct = 50;
     // null = the altitude-adaptive terminus (the default). A number pins the
     // outside-fill opacity as a percent, 94..100. (`sce`, 2026-08-17)
     this._scopeTerminusPct = null;
@@ -181,7 +181,7 @@ export class ShareLinkManager {
       parseOr(params.get('dd'), 50),
       50,
     );
-    const style = URL_TO_STYLE[params.get('style')] || 'normal';
+    const style = URL_TO_STYLE[params.get('style')] || 'odin';
     const decodedLayerState = decodeLayerStateParams(params);
     const state = {
       lat,
@@ -197,7 +197,7 @@ export class ShareLinkManager {
       bloomIntensity: parseOr(params.get('bi'), LEGACY_BLOOM_FALLBACK),
       bloomVersion: parseOr(params.get('bv'), 1),
       sharpenIntensity: parseOr(params.get('si'), 49),
-      hudVariant: params.get('hud') || 'tactical',
+      hudVariant: params.get('hud') || 'odin',
       hudVisible: params.get('hv') === '1',
       detectionMode: restoredDetection.enabled
         ? restoredDetection.profile
@@ -563,7 +563,7 @@ export class ShareLinkManager {
       'roll',
       Math.round(Cesium.Math.toDegrees(camera.roll)).toString(),
     );
-    params.set('style', STYLE_TO_URL[this._currentStyle] || 'normal');
+    params.set('style', STYLE_TO_URL[this._currentStyle] || 'odin');
     params.set('bloom', this._bloomEnabled ? '1' : '0');
     params.set('sharpen', this._sharpenEnabled ? '1' : '0');
     params.set('bi', Math.round(this._bloomIntensity).toString());

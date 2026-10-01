@@ -53,6 +53,11 @@ const HUD_COLORS = {
     glow: 'rgba(255, 170, 0, 0.5)',
     border: 'rgba(255, 170, 0, 0.2)',
   },
+  odin: {
+    main: 'rgba(51, 255, 51, 0.8)',
+    glow: 'rgba(51, 255, 51, 0.5)',
+    border: 'rgba(51, 255, 51, 0.2)',
+  },
   _default: {
     main: 'rgba(0, 255, 255, 0.6)',
     glow: 'rgba(0, 255, 255, 0.4)',
@@ -61,7 +66,7 @@ const HUD_COLORS = {
 };
 
 /** Shader modes that automatically show the HUD overlay. */
-const MILITARY_STYLES = new Set(['retro', 'surveillance', 'thermal']);
+const MILITARY_STYLES = new Set(['retro', 'surveillance', 'thermal', 'odin']);
 
 const HUD_SUMMARY_INTERVAL_MS = 15000;
 
@@ -818,7 +823,12 @@ export class IntelHUD {
     // Update mode label
     const modeEl = document.getElementById('hud-mode');
     if (modeEl) {
-      const modeNames = { surveillance: 'NVG', thermal: 'FLIR', retro: 'CRT' };
+      const modeNames = {
+        surveillance: 'NVG',
+        thermal: 'FLIR',
+        retro: 'CRT',
+        odin: 'ODIN',
+      };
       modeEl.textContent = modeNames[styleName] || styleName.toUpperCase();
     }
     // Update color scheme

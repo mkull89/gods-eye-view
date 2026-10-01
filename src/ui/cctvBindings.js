@@ -6,6 +6,41 @@ export function _initCctvPanel() {
     await this.actions.toggleEnabled();
   });
 
+  this.listen(this._cctvReloadCatalogBtn, 'click', async () => {
+    const button = this._cctvReloadCatalogBtn;
+    if (!button || button.disabled || typeof this.cctv.reloadCatalog !== 'function')
+      return;
+    button.disabled = true;
+    button.textContent = 'RELOADING…';
+    try {
+      const result = await this.cctv.reloadCatalog();
+      if (this.destroyed) return;
+      if (result?.ok) {
+        this.actions.showToast(
+          `Camera catalog refreshed · ${result.count.toLocaleString()} cameras`,
+        );
+      } else if (result?.reason === 'partial') {
+        this.actions.showToast(
+          `Only ${result.received.toLocaleString()} cameras responded · kept the current catalog`,
+        );
+      } else {
+        this.actions.showToast(
+          'Camera catalog refresh failed · try again when connected',
+        );
+      }
+    } catch {
+      if (!this.destroyed)
+        this.actions.showToast(
+          'Camera catalog refresh failed · try again when connected',
+        );
+    } finally {
+      if (!this.destroyed && button.isConnected) {
+        button.disabled = false;
+        button.textContent = 'RELOAD CATALOG';
+      }
+    }
+  });
+
   this.listen(this._cctvNearestBtn, 'click', async () => {
     const generation = ++this._actionGeneration;
     const activeId = this._cctvState?.activeCameraId;

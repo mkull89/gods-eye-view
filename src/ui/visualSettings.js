@@ -195,7 +195,7 @@ export class VisualSettings {
       holdRender: services.holdContinuousRender,
       releaseRender: services.releaseContinuousRender,
     });
-    this.activeStyle = 'normal';
+    this.activeStyle = 'odin';
     document.documentElement.dataset.gevStyle = this.activeStyle;
     this._detectionUserOverridden = false;
     this._cockpitVisionMode = 'optical';
@@ -1564,7 +1564,12 @@ export class VisualSettings {
     });
 
     // Update style indicator
-    const displayNames = { surveillance: 'NVG', thermal: 'FLIR', retro: 'CRT' };
+    const displayNames = {
+      surveillance: 'NVG',
+      thermal: 'FLIR',
+      retro: 'CRT',
+      odin: 'ODIN',
+    };
     this._styleIndicator.textContent =
       displayNames[styleName] || styleName.toUpperCase();
     this._updateStyleMiniStatus(styleName);
@@ -1600,7 +1605,7 @@ export class VisualSettings {
     if (!this._styleMiniValue) return;
     this._styleMiniValue.textContent =
       STYLE_STATUS_LABELS[styleName] ||
-      String(styleName || 'normal').toUpperCase();
+      String(styleName || 'odin').toUpperCase();
   }
 
   _updateHudButtonState() {

@@ -953,6 +953,7 @@ export class StyleManager extends ShellFacade {
         _cctvPanel: this._cctvPanel,
         _cctvPrevBtn: this._cctvPrevBtn,
         _cctvProjectionBtn: this._cctvProjectionBtn,
+        _cctvReloadCatalogBtn: this._cctvReloadCatalogBtn,
         _cctvQualityChip: this._cctvQualityChip,
         _cctvSelect: this._cctvSelect,
         _cctvSourceBadge: this._cctvSourceBadge,
@@ -1232,7 +1233,7 @@ export class StyleManager extends ShellFacade {
    */
   getControlState() {
     return {
-      style: this.activeStyle || 'normal',
+      style: this.activeStyle || 'odin',
       mapStack: this.mapStackController?.getActiveId?.() || null,
       hud: {
         visible: !!this.hud?.visible,
@@ -1356,7 +1357,7 @@ export class StyleManager extends ShellFacade {
    * 2. Crossfades the new shader stage intensity to 1.
    * 3. Applies style preset defaults (bloom/sharpen/HUD) if applyPreset is true.
    * 4. Updates button highlights, style indicator, slider panel, HUD, and detection overlay.
-   * @param {string} styleName - Target style ('normal'|'retro'|'surveillance'|'thermal'|'anime'|'noir'|'snow').
+   * @param {string} styleName - Target style ('normal'|'retro'|'surveillance'|'thermal'|'anime'|'noir'|'snow'|'odin').
    * @param {object} [options]
    * @param {boolean} [options.applyPreset=true] - Whether to apply STYLE_PRESET_DEFAULTS for the new style.
    * @returns {void}
@@ -1440,7 +1441,7 @@ export class StyleManager extends ShellFacade {
   // ── HUD Toggle ───────────────────────────────
 
   /**
-   * Wires the HUD toggle button, initializes the default HUD variant to 'tactical',
+   * Wires the HUD toggle button, initializes the default HUD variant to 'odin',
    * and sets up the detection mode cycle button.
    * @returns {void}
    */
@@ -1457,9 +1458,9 @@ export class StyleManager extends ShellFacade {
 
   _initHUDToggle() {
     if (this._hudLayoutSelect) {
-      this._hudLayoutSelect.value = 'tactical';
+      this._hudLayoutSelect.value = 'odin';
     }
-    this._setHudVariant('tactical');
+    this._setHudVariant('odin');
     this.hud.setMode('on');
     this._updateHudButtonState();
 

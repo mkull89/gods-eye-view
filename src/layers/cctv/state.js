@@ -216,5 +216,17 @@ export function createState({ services }) {
   layerState._catalogRefreshTimer = null;
 
   layerState._pendingCatalogSources = null;
+
+  layerState._catalogVisibilityListener = null;
+
+  layerState._catalogHiddenAt = 0;
+
+  layerState._catalogWakeRefreshTimer = null;
+
+  layerState._catalogLastRefreshAt = 0;
+
+  layerState._catalogLastVisibilityReturnAt = 0;
+
+  layerState._catalogWindowReturnListener = null;
   return layerState;
 }
